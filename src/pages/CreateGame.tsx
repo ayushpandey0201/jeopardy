@@ -162,7 +162,6 @@ const CreateGame = () => {
   const saveAllQuestions = async () => {
     // Check if all questions are filled
     const hasEmptyQuestions = Object.values(currentQuestions).some(q => !q.trim());
-    
     if (hasEmptyQuestions) {
       toast({
         title: "Empty Questions",
@@ -171,15 +170,13 @@ const CreateGame = () => {
       });
       return;
     }
-    
+
     // Create category and questions
     const newCategory: Category = {
       id: Date.now().toString(),
       name: categoryName,
       questions: []
     };
-    
-    // Add all questions from currentQuestions object
     ['easy', 'medium', 'hard'].forEach(difficulty => {
       for (let i = 0; i < questionsPerDifficulty; i++) {
         const key = `${difficulty}_${i}`;
@@ -192,48 +189,18 @@ const CreateGame = () => {
       }
     });
 
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast({
-          title: "Authentication Error",
-          description: "Please log in again",
-          variant: "destructive",
-        });
-        navigate('/admin/login');
-        return;
-      }
+    // Add the new category to the categories array
+    setCategories(prev => [...prev, newCategory]);
+    setCategoryName('');
+    setCurrentQuestions({});
+    setCurrentDifficulty('easy');
+    setCurrentQuestionIndex(0);
+    setStep(1); // Go back to step 1 to add another category
 
-      const response = await fetch('http://localhost:3000/api/games', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          categories: [newCategory]
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast({
-          title: "Category Created",
-          description: `Successfully created category "${categoryName}" with ${newCategory.questions.length} questions`,
-        });
-        navigate('/admin/dashboard');
-      } else {
-        throw new Error(data.message || 'Failed to save category');
-      }
-    } catch (error) {
-      console.error('Error saving category:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save category. Please try again.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Category Added",
+      description: `Category "${newCategory.name}" added. (${categories.length + 1}/5)`
+    });
   };
 
   const handleSaveGame = async () => {
@@ -245,23 +212,20 @@ const CreateGame = () => {
       });
       return;
     }
-
-    if (categories.length === 0) {
+    if (categories.length !== 5) {
       toast({
         title: "Error",
-        description: "Please add at least one category",
+        description: "You must add exactly 5 categories to save the game.",
         variant: "destructive"
       });
       return;
     }
-
     setIsSaving(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No authentication token found');
       }
-
       const response = await fetch('http://localhost:3000/api/games', {
         method: 'POST',
         headers: {
@@ -273,17 +237,14 @@ const CreateGame = () => {
           categories
         })
       });
-
       if (!response.ok) {
         throw new Error('Failed to save game');
       }
-
       toast({
         title: "Success",
         description: "Game saved successfully",
       });
-
-      navigate('/admin');
+      navigate('/admin/dashboard');
     } catch (error) {
       console.error('Error saving game:', error);
       toast({
@@ -489,6 +450,41 @@ const CreateGame = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {categories.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xl text-jeopardy-gold font-jeopardy mb-2">Added Categories ({categories.length}/5):</h2>
+            <ul className="list-disc list-inside text-white">
+              {categories.map((cat, idx) => (
+                <li key={cat.id}>{idx + 1}. {cat.name}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Game Name input field */}
+        {categories.length === 5 && (
+          <div className="mb-6">
+            <label htmlFor="gameName" className="block text-white font-semibold mb-2">
+              Game Name
+            </label>
+            <Input
+              id="gameName"
+              value={gameName}
+              onChange={(e) => setGameName(e.target.value)}
+              className="jeopardy-input"
+              placeholder="Enter a name for your game"
+            />
+          </div>
+        )}
+
+        <Button 
+          onClick={handleSaveGame}
+          className="jeopardy-btn w-full mt-4"
+          disabled={categories.length !== 5 || !gameName.trim() || isSaving}
+        >
+          Save Game
+        </Button>
       </div>
     </div>
   );

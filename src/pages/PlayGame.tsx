@@ -32,6 +32,18 @@ interface Game {
   createdAt: string;
 }
 
+// Utility functions for localStorage persistence
+const getPersistedGame = (gameId: string) => {
+  const data = localStorage.getItem(`visitedState_${gameId}`);
+  return data ? JSON.parse(data) : null;
+};
+const setPersistedGame = (gameId: string, gameData: Game) => {
+  localStorage.setItem(`visitedState_${gameId}`, JSON.stringify(gameData));
+};
+const clearPersistedGame = (gameId: string) => {
+  localStorage.removeItem(`visitedState_${gameId}`);
+};
+
 export default function PlayGame() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -53,7 +65,13 @@ export default function PlayGame() {
       navigate('/admin');
       return;
     }
-    setGame(location.state.game);
+    // Try to load persisted visited state
+    const persisted = getPersistedGame(location.state.game._id);
+    if (persisted) {
+      setGame(persisted);
+    } else {
+      setGame(location.state.game);
+    }
   }, [location.state, navigate, toast]);
 
   const handleSelectCategoryDifficulty = (categoryId: string, difficulty: string) => {
@@ -76,6 +94,7 @@ export default function PlayGame() {
       }))
     };
     setGame(updatedGame);
+    setPersistedGame(game!._id, updatedGame);
     setSelectedQuestion({ ...question, visited: true });
     setShowQuestion(true);
   };
@@ -89,7 +108,6 @@ export default function PlayGame() {
 
   const handleRestartGame = () => {
     if (!game) return;
-    
     const updatedGame = {
       ...game,
       categories: game.categories.map(category => ({
@@ -100,13 +118,12 @@ export default function PlayGame() {
         }))
       }))
     };
-    
     setGame(updatedGame);
+    clearPersistedGame(game._id);
     setSelectedCategory(null);
     setSelectedDifficulty(null);
     setSelectedQuestion(null);
     setShowQuestion(false);
-    
     toast({
       title: "Game Restarted",
       description: "All questions have been reset",
@@ -115,27 +132,24 @@ export default function PlayGame() {
 
   const handleDeleteGame = async () => {
     if (!game) return;
-
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No authentication token found');
       }
-
       const response = await fetch(`http://localhost:3000/api/games/${game._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-
       const data = await response.json();
-
       if (response.ok) {
         toast({
           title: "Success",
           description: "Game deleted successfully",
         });
+        clearPersistedGame(game._id);
         navigate('/admin/dashboard');
       } else {
         throw new Error(data.message || 'Failed to delete game');
